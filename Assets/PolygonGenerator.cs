@@ -10,16 +10,16 @@ public static class PolygonGenerator {
     {
         float r = 20;
         float angleIncrement = 360f / n;
-        Vector2[] points = new Vector2[n];
+        Vertex[] vertices = new Vertex[n];
         for (int i = 0; i < n; i++)
         {
             float angle = angleIncrement * i * Mathf.Deg2Rad;
             float randR = r/2f + Random.value * (r / 2f);
             Vector2 onCircle = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * randR;
-            points[i] = onCircle;
+            vertices[i] = new Vertex(onCircle,i);
         }
 
-        current = new Polygon(points);
+        current = new Polygon(vertices);
     }
 
 

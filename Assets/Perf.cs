@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Diagnostics;
+using System.Linq;
 
 public class Perf : MonoBehaviour {
 
@@ -9,16 +10,17 @@ public class Perf : MonoBehaviour {
     public int numPoints = 100;
 
 	void Start () {
-
+       
         PolygonGenerator.Create(numPoints);
         Polygon testPoly = PolygonGenerator.current;
-
-        Stopwatch sw = new Stopwatch();
+        Vector2[] pointsArray = testPoly.vertices.Select(v => v.position).ToArray();
+	    Stopwatch sw = new Stopwatch();
 
         sw.Start();
         for (int i = 0; i < it; i++)
         {
             Triangulator c = new Triangulator(testPoly);
+            c.Triangulate();
         }
         sw.Stop();
 
@@ -28,7 +30,7 @@ public class Perf : MonoBehaviour {
 		sw.Start();
 		for (int i = 0; i < it; i++)
 		{
-            EarClipper.Triangulate(testPoly.points);
+            EarClipper.Triangulate(pointsArray);
 		}
 		sw.Stop();
 

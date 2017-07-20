@@ -35,13 +35,11 @@ public class EarClipper
     {
         int numberOfPoints = points.Length;
         List<int> usePoints = new List<int>();
-        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
-        sw.Start();
+    
         for(int p=0; p<numberOfPoints; p++)
             usePoints.Add(p);
         int numberOfUsablePoints = usePoints.Count;
-        sw.Stop();
-        Debug.Log("theirs add time: " + sw.ElapsedMilliseconds);
+
         List<int> indices = new List<int>();
         
         if (numberOfPoints < 3)
