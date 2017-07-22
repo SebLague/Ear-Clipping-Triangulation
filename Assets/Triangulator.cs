@@ -10,18 +10,15 @@ public class Triangulator
 	// only reflex verts can be inside triangle
 	// when removing ear: convex verts remain convex; but relfex verts may become convex
 
-	Polygon polygon;
     public LinkedList<Vertex> vertsInClippedPolygon;
     int[] tris;
     int triIndex;
 
     public Triangulator(Polygon polygon)
     {
-        this.polygon = polygon;
-        tris = new int[(polygon.numPoints-2+2)*3];
-        // create linked list containing all vertexnodes.
-        // vertexNode is a class containing vertex + whether or not that vertex is convex
+        tris = new int[(polygon.numPoints-2+2)*3]; // +2 for extra hole verts
 
+        // find maxX hole vertex
         float holeVertexMaxX = float.MinValue;
         int holeIndexMaxX = 0;
         for (int i = 0; i < polygon.numHolePoints; i++)
@@ -33,7 +30,8 @@ public class Triangulator
             }
         }
 
-        vertsInClippedPolygon = new LinkedList<Vertex>();
+		// setup linked list containing all vertices.
+		vertsInClippedPolygon = new LinkedList<Vertex>();
         LinkedListNode<Vertex> previousNode = null;
 		LinkedListNode<Vertex> nodeOnClosestLineToHoleMaxX = null;
         float minXDstFromHullToHoleMaxX = float.MaxValue;
