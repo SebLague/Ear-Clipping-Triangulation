@@ -6,6 +6,7 @@ using UnityEditor;
 
 public class PolygonDrawer : MonoBehaviour {
 
+    public bool drawMesh;
     public bool showTris;
     public bool useGiz = false;
     public Transform holeHolder;
@@ -17,8 +18,7 @@ public class PolygonDrawer : MonoBehaviour {
 
     private void Start()
     {
-		Polygon poly = GetPolygon();
-		triangulator = new Triangulator(poly);
+		
         //int[] tris = triangulator.Triangulate();
         StartCoroutine(Draw());
 	}
@@ -29,16 +29,29 @@ public class PolygonDrawer : MonoBehaviour {
         {
             inputDown = true;
         }
+
+        if (drawMesh)
+        {
+            Triangulator tt = new Triangulator(GetPolygon());
+            Mesh mesh = new Mesh();
+            mesh.vertices = GetPolygon().points.Select(v2=>(Vector3)v2).ToArray();
+            mesh.triangles = tt.Triangulate().Reverse().ToArray();
+           // mesh.normals = mesh.vertices.Select(v => Vector3.forward).ToArray();
+            GetComponent<MeshFilter>().mesh = mesh;
+        }
     }
 
     IEnumerator Draw()
     {
+        yield return new WaitUntil(() => inputDown);
+		Polygon poly = GetPolygon();
+		triangulator = new Triangulator(poly);
         LinkedListNode<Vertex> v = triangulator.vertsInClippedPolygon.First;
         while (true)
         {
             //yield return null;
-            yield return new WaitUntil(() => inputDown);
-            print("next : " + v.Value.index + "  " + v.Value.position + "   " + GetPolygon().points[v.Value.index]);
+           
+            print("next : " + v.Value.index );
             inputDown = false;
             draw.Add(v.Value.position);
             if (v.Next == null)
@@ -46,6 +59,7 @@ public class PolygonDrawer : MonoBehaviour {
                 break;
             }
             v = v.Next;
+			yield return new WaitUntil(() => inputDown);
         }
 		print("done");
     }

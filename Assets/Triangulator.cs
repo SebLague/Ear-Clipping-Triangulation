@@ -29,7 +29,7 @@ public class Triangulator
             if (polygon.points[i + polygon.numHullPoints].x > holeVertexMaxX)
             {
                 holeVertexMaxX = polygon.points[i + polygon.numHullPoints].x;
-                holeIndexMaxX = i;
+                holeIndexMaxX = i + polygon.numHullPoints;
             }
         }
 
@@ -75,7 +75,7 @@ public class Triangulator
                         intersectX = (intersectY - c) / gradient;
                     }
                     float dstX = intersectX - holeVertexMaxX;
-                    if (dstX < minXDstFromHullToHoleMaxX)
+                    if (dstX < minXDstFromHullToHoleMaxX && dstX > 0) // dont allow points to the left
                     {
                         minXDstFromHullToHoleMaxX = dstX;
                         nodeOnClosestLineToHoleMaxX = (previousPoint.x > currentPoint.x)?previousNode.Previous:previousNode; // chose node on line with max x since other may be behind maxHoleX
@@ -84,7 +84,7 @@ public class Triangulator
             }
 
             // point needs to be tested for collision with hole triangle if reflex, and between holeMaxX and closestPointOnHullX, and not on that line
-            if (!vertexIsConvex && currentPoint.x <= holeVertexMaxX + minXDstFromHullToHoleMaxX && currentPoint.x >= holeVertexMaxX && i != nodeOnClosestLineToHoleMaxX.Value.index)
+            if (!vertexIsConvex && currentPoint.x <= holeVertexMaxX + minXDstFromHullToHoleMaxX && currentPoint.x >= holeVertexMaxX && (nodeOnClosestLineToHoleMaxX == null || i != nodeOnClosestLineToHoleMaxX.Value.index))
             {
                 pointsToCheckHole.Add(previousNode);
             }
@@ -92,7 +92,7 @@ public class Triangulator
         }
 
         // find best connection point for hole
-        Vector2 closestVisibleHolePointOnHull = new Vector2(minXDstFromHullToHoleMaxX + holeIndexMaxX, polygon.points[holeIndexMaxX].y);
+        Vector2 closestVisibleHolePointOnHull = new Vector2(minXDstFromHullToHoleMaxX + holeVertexMaxX, polygon.points[holeIndexMaxX].y);
         LinkedListNode<Vertex> holeConnectionNode = nodeOnClosestLineToHoleMaxX;
 
         foreach (LinkedListNode<Vertex> v in pointsToCheckHole)
@@ -114,13 +114,19 @@ public class Triangulator
         {
 			int previousVertexIndex = previousNode.Value.index;
             int nextVertexIndex = polygon.numHullPoints + ((i + 1) % polygon.numHolePoints);
+            if (i == polygon.numHolePoints + holeIndexMaxX) // repeated first node may have different ccw than actual first
+            {
+                nextVertexIndex = holeConnectionNode.Value.index;
+            }
             int currentVertexIndex = polygon.numHullPoints + (i % polygon.numHolePoints);
 			bool vertexIsConvex = IsCCW(polygon.points[previousVertexIndex], polygon.points[currentVertexIndex], polygon.points[nextVertexIndex]);
             Vertex newHoleVert = new Vertex(polygon.points[currentVertexIndex], currentVertexIndex, vertexIsConvex);
             previousNode = vertsInClippedPolygon.AddAfter(previousNode, newHoleVert);
         }
 
-        vertsInClippedPolygon.AddAfter(previousNode, holeConnectionNode.Value); // repeat first hull node before hole
+        bool isCCW = IsCCW(previousNode.Value.position, holeConnectionNode.Value.position, previousNode.Next.Value.position);
+        Vertex repeatStartHoleHullVert = new Vertex(holeConnectionNode.Value.position, holeConnectionNode.Value.index, isCCW);
+        vertsInClippedPolygon.AddAfter(previousNode, repeatStartHoleHullVert); // repeat first hull node before hole (note must have own ccw calc)
 
     }
 
@@ -128,7 +134,7 @@ public class Triangulator
     public int[] Triangulate()
     {
 
-        while (vertsInClippedPolygon.Count > 3)
+        while (vertsInClippedPolygon.Count >= 3)
         {
             bool hasRemovedEarThisIteration = false;
             LinkedListNode<Vertex> vertexNode = vertsInClippedPolygon.First;

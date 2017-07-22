@@ -10,7 +10,7 @@ public class Perf : MonoBehaviour {
     public int numPoints = 100;
 
 	void Start () {
-       
+        
         PolygonGenerator.Create(numPoints);
         Polygon testPoly = PolygonGenerator.current;
         Vector2[] pointsArray = testPoly.points.Select(v => v).ToArray();
