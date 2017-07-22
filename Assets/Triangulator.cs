@@ -11,39 +11,67 @@ public class Triangulator
 	// when removing ear: convex verts remain convex; but relfex verts may become convex
 
 	Polygon polygon;
-    LinkedList<VertexNode> vertsInClippedPolygon;
+    public LinkedList<Vertex> vertsInClippedPolygon;
     int[] tris;
     int triIndex;
 
     public Triangulator(Polygon polygon)
     {
         this.polygon = polygon;
-        tris = new int[(polygon.numVerts-2)*3];
+        tris = new int[(polygon.numPoints-2+2)*3];
         // create linked list containing all vertexnodes.
         // vertexNode is a class containing vertex + whether or not that vertex is convex
 
-        vertsInClippedPolygon = new LinkedList<VertexNode>();
-        LinkedListNode<VertexNode> prevLinkedListNode = null;
+        // TODO: calculate hole insert index
+        int holeInsertAfterIndex = 0;
 
-        for (int i = 0; i < polygon.numVerts; i++)
+        vertsInClippedPolygon = new LinkedList<Vertex>();
+        LinkedListNode<Vertex> previousNode = null;
+
+        for (int i = 0; i < polygon.numHullPoints; i++)
         {
-            Vertex currentVertex = polygon.vertices[i];
-            Vertex previousVertex = polygon.vertices[(i - 1+polygon.numVerts) % polygon.numVerts];
-            Vertex nextVertex = polygon.vertices[(i + 1) % polygon.numVerts];
 
-            bool vertexIsConvex = IsCCW(previousVertex, currentVertex, nextVertex);
-            VertexNode vertexNode = new VertexNode(currentVertex, vertexIsConvex);
+            //int previousVertexIndex = previousNode?.Value.index ?? polygon.numHullPoints -1;
+            int previousVertexIndex = (i - 1 + polygon.numHullPoints) % polygon.numHullPoints;
+            int nextVertexIndex = (i + 1) % polygon.numHullPoints;
 
-            if (prevLinkedListNode == null)
+            bool vertexIsConvex = IsCCW(polygon.points[previousVertexIndex], polygon.points[i], polygon.points[nextVertexIndex]);
+            Vertex currentHullVertex = new Vertex(polygon.points[i], i, vertexIsConvex);
+           
+            if (previousNode == null)
             {
-                prevLinkedListNode = vertsInClippedPolygon.AddFirst(vertexNode);
+                previousNode = vertsInClippedPolygon.AddFirst(currentHullVertex);
             }
             else
             {
-                prevLinkedListNode = vertsInClippedPolygon.AddAfter(prevLinkedListNode, vertexNode);
+                previousNode = vertsInClippedPolygon.AddAfter(previousNode, currentHullVertex);
+            }
+           // Debug.Log("Add hull vertex: " + previousNode.Value.index);
+            // insert hole
+            if (i == holeInsertAfterIndex)
+            {
+                Vertex firstHoleVertex = null;
+                for (int j = 0; j < polygon.numHolePoints; j++)
+                {
+                    previousVertexIndex = previousNode.Value.index;
+                    nextVertexIndex = polygon.numHullPoints + (j + 1) % polygon.numHolePoints;
+                    vertexIsConvex = IsCCW(polygon.points[previousVertexIndex], polygon.points[polygon.numHullPoints+j], polygon.points[nextVertexIndex]);
+                    Vertex holeVertex = new Vertex(polygon.points[j + polygon.numHullPoints], polygon.numHullPoints+j, vertexIsConvex);
+                    previousNode = vertsInClippedPolygon.AddAfter(previousNode, holeVertex);
+                    //Debug.Log("Add hole vertex: " + j + " (" + previousNode.Value.index + ")  " + previousNode.Value.position);
+                    if (j == 0)
+                    {
+                        firstHoleVertex = holeVertex;
+                    }
+                }
+
+                Vertex endHoleVertex = new Vertex(firstHoleVertex); // repeat first hole vertex
+                previousNode = vertsInClippedPolygon.AddAfter(previousNode, endHoleVertex);
+                //Debug.Log("Repeat first hole vertex: " + previousNode.Value.index);
+                previousNode = vertsInClippedPolygon.AddAfter(previousNode, new Vertex(currentHullVertex)); // repeat first hull vertex before hole
+                //Debug.Log("Repeat first hull vertex: " + previousNode.Value.index);
             }
         }
-
     }
 
 
@@ -52,43 +80,51 @@ public class Triangulator
 
         while (vertsInClippedPolygon.Count > 3)
         {
-            LinkedListNode<VertexNode> vertexNode = vertsInClippedPolygon.First;
+            bool hasRemovedEarThisIteration = false;
+            LinkedListNode<Vertex> vertexNode = vertsInClippedPolygon.First;
             for (int i = 0; i < vertsInClippedPolygon.Count; i++)
             {
-                LinkedListNode<VertexNode> prevVertexNode = vertexNode.Previous ?? vertsInClippedPolygon.Last;
-                LinkedListNode<VertexNode> nextVertexNode = vertexNode.Next ?? vertsInClippedPolygon.First;
+                LinkedListNode<Vertex> prevVertexNode = vertexNode.Previous ?? vertsInClippedPolygon.Last;
+                LinkedListNode<Vertex> nextVertexNode = vertexNode.Next ?? vertsInClippedPolygon.First;
 
                 if (vertexNode.Value.isConvex)
                 {
-                    if (!TriangleContainsVertex(prevVertexNode.Value.vertex, vertexNode.Value.vertex, nextVertexNode.Value.vertex))
+                    if (!TriangleContainsVertex(prevVertexNode.Value, vertexNode.Value, nextVertexNode.Value))
 					{
                         // check if removal of ear makes prev/next vertex convex (if was previously reflex)
                         if (!prevVertexNode.Value.isConvex)
                         {
-                            LinkedListNode<VertexNode> prevOfPrev = prevVertexNode.Previous ?? vertsInClippedPolygon.Last;
-                            prevVertexNode.Value.isConvex = IsCCW(prevOfPrev.Value.vertex, prevVertexNode.Value.vertex, nextVertexNode.Value.vertex);
+                            LinkedListNode<Vertex> prevOfPrev = prevVertexNode.Previous ?? vertsInClippedPolygon.Last;
+                            prevVertexNode.Value.isConvex = IsCCW(prevOfPrev.Value.position, prevVertexNode.Value.position, nextVertexNode.Value.position);
                         }
                         if (!nextVertexNode.Value.isConvex)
                         {
-                            LinkedListNode<VertexNode> nextOfNext = nextVertexNode.Next ?? vertsInClippedPolygon.First;
-                            nextVertexNode.Value.isConvex = IsCCW(prevVertexNode.Value.vertex, nextVertexNode.Value.vertex, nextOfNext.Value.vertex);
+                            LinkedListNode<Vertex> nextOfNext = nextVertexNode.Next ?? vertsInClippedPolygon.First;
+                            nextVertexNode.Value.isConvex = IsCCW(prevVertexNode.Value.position, nextVertexNode.Value.position, nextOfNext.Value.position);
                         }
 
                     
                         // add triangle to tri array
-                        tris[triIndex * 3] = prevVertexNode.Value.vertex.index;
-                        tris[triIndex * 3 + 1] = vertexNode.Value.vertex.index;
-                        tris[triIndex * 3 + 2] = nextVertexNode.Value.vertex.index;
+                        tris[triIndex * 3] = prevVertexNode.Value.index;
+                        tris[triIndex * 3 + 1] = vertexNode.Value.index;
+                        tris[triIndex * 3 + 2] = nextVertexNode.Value.index;
                         triIndex++;
 
 						// remove ear
 						vertsInClippedPolygon.Remove(vertexNode);
+                        hasRemovedEarThisIteration = true;
                         break;
 					}
                 }
               
 
                 vertexNode = vertexNode.Next;
+            }
+
+            if (!hasRemovedEarThisIteration)
+            {
+                Debug.LogError("Error triangulating mesh. Aborted.");
+                return null;
             }
         }
 
@@ -98,12 +134,12 @@ public class Triangulator
     // check if triangle contains any verts (note, only necessary to check reflex verts).
     bool TriangleContainsVertex(Vertex v0, Vertex v1, Vertex v2)
 	{
-        LinkedListNode<VertexNode> vertexNode = vertsInClippedPolygon.First;
+        LinkedListNode<Vertex> vertexNode = vertsInClippedPolygon.First;
 		for (int i = 0; i < vertsInClippedPolygon.Count; i++)
 		{
             if (!vertexNode.Value.isConvex) // convex verts will never be inside triangle
             {
-                Vertex vertexToCheck = vertexNode.Value.vertex;
+                Vertex vertexToCheck = vertexNode.Value;
 
                 if (vertexToCheck.index != v0.index && vertexToCheck.index != v1.index && vertexToCheck.index != v2.index) // dont check verts that make up triangle
                 {
@@ -120,61 +156,32 @@ public class Triangulator
         return false;
 	}
 
-    bool IsCCW(Vertex v0, Vertex v1, Vertex v2)
+    bool IsCCW(Vector2 v0, Vector2 v1, Vector2 v2)
     {
-        return Geometry.SideOfLine(v0.position, v2.position, v1.position) == -1;
+        //return Vector2.Angle(v2.position - v0.position, v1.position - v0.position) < 180;
+        return Geometry.SideOfLine(v0, v2, v1) == -1;
     }
 
-    /*
-
-
-   public void Triangulate()
-   {
-
-
-	   while (verticesInReducedPolygon.Count > 3)
-	   {
-
-		   LinkedListNode<Vertex> startNode = verticesInReducedPolygon.First;
-
-
-		   for (int i = 1; i < verticesInReducedPolygon.Count; i++)
-		   {
-			   LinkedListNode<Vertex> midNode = startNode.Next ?? verticesInReducedPolygon.First;
-			   LinkedListNode<Vertex>  endNode = midNode.Next ?? verticesInReducedPolygon.First;
-
-			   if (IsEar(startNode.Value.position, midNode.Value.position, endNode.Value.position))
-			   {
-				   linePairs.Add(startNode.Value.position);
-				   linePairs.Add(endNode.Value.position);
-				   verticesInReducedPolygon.Remove(midNode);
-				   break;
-			   }
-
-			   startNode = startNode.Next;
-		   }
-
-	   }
-
-
-   }
-
-
-
-  
-*/
-
-    public class VertexNode
-    {
-        public readonly Vertex vertex;
-        public bool isConvex;
-
-        public VertexNode(Vertex vertex, bool isConvex)
-        {
-            this.vertex = vertex;
-            this.isConvex = isConvex;
-        }
-    }
 
 }
 
+public class Vertex
+{
+	public readonly Vector2 position;
+	public readonly int index;
+	public bool isConvex;
+
+	public Vertex(Vector2 position, int index, bool isConvex)
+	{
+		this.position = position;
+		this.index = index;
+		this.isConvex = isConvex;
+	}
+
+	public Vertex(Vertex vertex)
+	{
+		position = vertex.position;
+		index = vertex.index;
+		isConvex = vertex.isConvex;
+	}
+}

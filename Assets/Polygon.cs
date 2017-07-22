@@ -4,24 +4,33 @@ using UnityEngine;
 
 public class Polygon {
 
-    public readonly Vertex[] vertices;
-    public readonly int numVerts;
+    public readonly Vector2[] points;
+    public readonly int numHullPoints;
+    public readonly int numHolePoints;
+    public readonly int numPoints;
 
-    public Polygon(Vertex[] vertices)
-    {
-        this.vertices = vertices;
-        numVerts = vertices.Length;
-    }
-}
 
-public struct Vertex
-{
-	public readonly Vector2 position;
-	public readonly int index;
-
-	public Vertex(Vector2 position, int index)
+    public Polygon(Vector2[] hullPoints, Vector2[] holePoints)
 	{
-		this.position = position;
-		this.index = index;
-	}
+        numHullPoints = hullPoints.Length;
+        numHolePoints = holePoints.Length;
+        numPoints = numHullPoints + numHolePoints;
+		points = new Vector2[numPoints];
+
+        // TODO: enforce cw vertices, ccw holeVertices
+
+
+        for (int i = 0; i < numHullPoints; i++)
+        {
+            points[i] = hullPoints[i];
+        }
+        for (int i = 0; i < numHolePoints; i++)
+        {
+            points[i + numHullPoints] = holePoints[i];
+        }
+
+    }
+
+
 }
+

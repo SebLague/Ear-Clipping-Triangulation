@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
+
 public class EarClipTriangle
 {
     public Vector2 a;

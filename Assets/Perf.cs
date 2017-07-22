@@ -13,7 +13,7 @@ public class Perf : MonoBehaviour {
        
         PolygonGenerator.Create(numPoints);
         Polygon testPoly = PolygonGenerator.current;
-        Vector2[] pointsArray = testPoly.vertices.Select(v => v.position).ToArray();
+        Vector2[] pointsArray = testPoly.points.Select(v => v).ToArray();
 	    Stopwatch sw = new Stopwatch();
 
         sw.Start();
@@ -30,7 +30,9 @@ public class Perf : MonoBehaviour {
 		sw.Start();
 		for (int i = 0; i < it; i++)
 		{
-            EarClipper.Triangulate(pointsArray);
+			//EarClipper.Triangulate(pointsArray);
+            WikiTri c = new WikiTri(pointsArray);
+			c.Triangulate();
 		}
 		sw.Stop();
 
