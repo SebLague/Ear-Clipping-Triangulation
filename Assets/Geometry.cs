@@ -41,4 +41,14 @@ public static class Geometry {
         float t2 = (r0.y - p0.y + a.y * t1) / b.y;
         return t1 >= 0 && t2 >= 0 && t2 <= 1;
     }
+
+    public static Vector2 RayLineSegmentIntersectPoint(Vector2 r0, Vector2 dir, Vector2 p0, Vector2 p1)
+	{
+		Vector2 a = dir;
+		Vector2 b = p1 - p0;
+
+		float t1 = (b.y * (p0.x - r0.x) + b.x * (r0.y - p0.y)) / (a.x * b.y - b.x * a.y);
+		//float t2 = (r0.y - p0.y + a.y * t1) / b.y;
+        return r0 + dir * t1;
+	}
 }

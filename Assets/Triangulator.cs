@@ -22,21 +22,33 @@ public class Triangulator
         // create linked list containing all vertexnodes.
         // vertexNode is a class containing vertex + whether or not that vertex is convex
 
-        // TODO: calculate hole insert index
-        int holeInsertAfterIndex = 0;
+        float holeVertexMaxX = float.MinValue;
+        int holeIndexMaxX = 0;
+        for (int i = 0; i < polygon.numHolePoints; i++)
+        {
+            if (polygon.points[i + polygon.numHullPoints].x > holeVertexMaxX)
+            {
+                holeVertexMaxX = polygon.points[i + polygon.numHullPoints].x;
+                holeIndexMaxX = i;
+            }
+        }
 
         vertsInClippedPolygon = new LinkedList<Vertex>();
         LinkedListNode<Vertex> previousNode = null;
+		LinkedListNode<Vertex> nodeOnClosestLineToHoleMaxX = null;
+        float minXDstFromHullToHoleMaxX = float.MaxValue;
+        List<LinkedListNode<Vertex>> pointsToCheckHole = new List<LinkedListNode<Vertex>>();
 
         for (int i = 0; i < polygon.numHullPoints; i++)
         {
 
             //int previousVertexIndex = previousNode?.Value.index ?? polygon.numHullPoints -1;
-            int previousVertexIndex = (i - 1 + polygon.numHullPoints) % polygon.numHullPoints;
-            int nextVertexIndex = (i + 1) % polygon.numHullPoints;
+            Vector2 previousPoint = polygon.points[(i - 1 + polygon.numHullPoints) % polygon.numHullPoints];
+            Vector2 nextPoint = polygon.points[(i + 1) % polygon.numHullPoints];
+            Vector2 currentPoint = polygon.points[i];
 
-            bool vertexIsConvex = IsCCW(polygon.points[previousVertexIndex], polygon.points[i], polygon.points[nextVertexIndex]);
-            Vertex currentHullVertex = new Vertex(polygon.points[i], i, vertexIsConvex);
+            bool vertexIsConvex = IsCCW(previousPoint, currentPoint, nextPoint);
+            Vertex currentHullVertex = new Vertex(currentPoint, i, vertexIsConvex);
            
             if (previousNode == null)
             {
@@ -46,32 +58,70 @@ public class Triangulator
             {
                 previousNode = vertsInClippedPolygon.AddAfter(previousNode, currentHullVertex);
             }
-           // Debug.Log("Add hull vertex: " + previousNode.Value.index);
-            // insert hole
-            if (i == holeInsertAfterIndex)
+
+            // test if horizontal ray to right of max x hole vertex intersects with line segment formed by previous-current vertex
+            if (previousPoint.x > holeVertexMaxX || currentPoint.x > holeVertexMaxX) // at least one point of line seg to right of hole
             {
-                Vertex firstHoleVertex = null;
-                for (int j = 0; j < polygon.numHolePoints; j++)
+                if (previousPoint.y > polygon.points[holeIndexMaxX].y != currentPoint.y > polygon.points[holeIndexMaxX].y) // prev/current points lie on either side of hole point
                 {
-                    previousVertexIndex = previousNode.Value.index;
-                    nextVertexIndex = polygon.numHullPoints + (j + 1) % polygon.numHolePoints;
-                    vertexIsConvex = IsCCW(polygon.points[previousVertexIndex], polygon.points[polygon.numHullPoints+j], polygon.points[nextVertexIndex]);
-                    Vertex holeVertex = new Vertex(polygon.points[j + polygon.numHullPoints], polygon.numHullPoints+j, vertexIsConvex);
-                    previousNode = vertsInClippedPolygon.AddAfter(previousNode, holeVertex);
-                    //Debug.Log("Add hole vertex: " + j + " (" + previousNode.Value.index + ")  " + previousNode.Value.position);
-                    if (j == 0)
+                    
+                    float intersectX = currentPoint.x; // true only if line is vertical
+
+                    if (!Mathf.Approximately(currentPoint.x, previousPoint.x)) // if not vertical line, then calculate intersectX
                     {
-                        firstHoleVertex = holeVertex;
+                        float intersectY = polygon.points[holeIndexMaxX].y;
+                        float gradient = (previousPoint.y - currentPoint.y) / (previousPoint.x - currentPoint.x);
+                        float c = currentPoint.y - gradient * currentPoint.x;
+                        intersectX = (intersectY - c) / gradient;
+                    }
+                    float dstX = intersectX - holeVertexMaxX;
+                    if (dstX < minXDstFromHullToHoleMaxX)
+                    {
+                        minXDstFromHullToHoleMaxX = dstX;
+                        nodeOnClosestLineToHoleMaxX = (previousPoint.x > currentPoint.x)?previousNode.Previous:previousNode; // chose node on line with max x since other may be behind maxHoleX
                     }
                 }
+            }
 
-                Vertex endHoleVertex = new Vertex(firstHoleVertex); // repeat first hole vertex
-                previousNode = vertsInClippedPolygon.AddAfter(previousNode, endHoleVertex);
-                //Debug.Log("Repeat first hole vertex: " + previousNode.Value.index);
-                previousNode = vertsInClippedPolygon.AddAfter(previousNode, new Vertex(currentHullVertex)); // repeat first hull vertex before hole
-                //Debug.Log("Repeat first hull vertex: " + previousNode.Value.index);
+            // point needs to be tested for collision with hole triangle if reflex, and between holeMaxX and closestPointOnHullX, and not on that line
+            if (!vertexIsConvex && currentPoint.x <= holeVertexMaxX + minXDstFromHullToHoleMaxX && currentPoint.x >= holeVertexMaxX && i != nodeOnClosestLineToHoleMaxX.Value.index)
+            {
+                pointsToCheckHole.Add(previousNode);
+            }
+
+        }
+
+        // find best connection point for hole
+        Vector2 closestVisibleHolePointOnHull = new Vector2(minXDstFromHullToHoleMaxX + holeIndexMaxX, polygon.points[holeIndexMaxX].y);
+        LinkedListNode<Vertex> holeConnectionNode = nodeOnClosestLineToHoleMaxX;
+
+        foreach (LinkedListNode<Vertex> v in pointsToCheckHole)
+        {
+            
+            if (Geometry.PointInTriangle(polygon.points[holeIndexMaxX], closestVisibleHolePointOnHull, nodeOnClosestLineToHoleMaxX.Value.position, v.Value.position))
+            {
+                // choose point which minimizes deltaAngle from holeMaxXPoint (i.e that with greatest y val). Use min x for tiebreak.
+                if (v.Value.position.y > holeConnectionNode.Value.position.y || (Mathf.Approximately(v.Value.position.y, holeConnectionNode.Value.position.y) && v.Value.position.x < holeConnectionNode.Value.position.x))
+                {
+                    holeConnectionNode = v;
+                }
             }
         }
+
+        // insert hole vertices into list
+        previousNode = holeConnectionNode;
+        for (int i = holeIndexMaxX; i <= polygon.numHolePoints + holeIndexMaxX; i++) // loop through all hole points and back to first one
+        {
+			int previousVertexIndex = previousNode.Value.index;
+            int nextVertexIndex = polygon.numHullPoints + ((i + 1) % polygon.numHolePoints);
+            int currentVertexIndex = polygon.numHullPoints + (i % polygon.numHolePoints);
+			bool vertexIsConvex = IsCCW(polygon.points[previousVertexIndex], polygon.points[currentVertexIndex], polygon.points[nextVertexIndex]);
+            Vertex newHoleVert = new Vertex(polygon.points[currentVertexIndex], currentVertexIndex, vertexIsConvex);
+            previousNode = vertsInClippedPolygon.AddAfter(previousNode, newHoleVert);
+        }
+
+        vertsInClippedPolygon.AddAfter(previousNode, holeConnectionNode.Value); // repeat first hull node before hole
+
     }
 
 
