@@ -28,10 +28,13 @@ public class PolygonEditor : Editor {
         }
 
         Handles.color = Color.red;
-        foreach (Transform t in poly.holeHolder)
+        foreach (Transform p in poly.holeHolder)
 		{
-			//t.position = Handles.DoPositionHandle(t.position, Quaternion.identity);
-            t.position = Handles.FreeMoveHandle(t.position, Quaternion.identity, .2f, Vector3.zero, Handles.SphereHandleCap);
+            foreach (Transform t in p)
+            {
+                //t.position = Handles.DoPositionHandle(t.position, Quaternion.identity);
+                t.position = Handles.FreeMoveHandle(t.position, Quaternion.identity, .2f, Vector3.zero, Handles.SphereHandleCap);
+            }
 		}
 		
 	}

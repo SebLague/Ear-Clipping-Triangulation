@@ -9,7 +9,7 @@ public class PolygonDrawer : MonoBehaviour {
     public bool drawMesh;
     public bool showTris;
     public bool useGiz = false;
-    public Transform holeHolder;
+    public Transform[] holeHolder;
 
     Triangulator triangulator;
 	List<Vector2> draw = new List<Vector2>();
@@ -67,8 +67,12 @@ public class PolygonDrawer : MonoBehaviour {
     public Polygon GetPolygon()
     {
         IEnumerable<Vector2> points = transform.GetComponentsInChildren<Transform>().Where(t => t != transform).Select(t => (Vector2)t.position);
-        IEnumerable<Vector2> holePoints = holeHolder.GetComponentsInChildren<Transform>().Where(t => t != holeHolder).Select(t => (Vector2)t.position);
-        return new Polygon(points.ToArray(), holePoints.ToArray());
+        List<Vector2[]> allHoles = new List<Vector2[]>();
+        foreach (Transform t in holeHolder)
+        {
+            allHoles.Add(t.GetComponentsInChildren<Transform>().Where(c => c != t).Select(h => (Vector2)h.position).ToArray());
+        }
+        return new Polygon(points.ToArray(), allHoles.ToArray());
     }
 
     private void OnDrawGizmos()
@@ -79,9 +83,12 @@ public class PolygonDrawer : MonoBehaviour {
         }
 
         Gizmos.color = Color.red;
+        List<Vector2> alreadyDone = new List<Vector2>();
         foreach (Vector2 v in draw)
         {
-            Gizmos.DrawSphere(v, .5f);
+            int num = alreadyDone.Count(x => x == v);
+            Gizmos.DrawSphere(v, .25f + .25f * num);
+            alreadyDone.Add(v);
         }
      
 		Polygon poly = GetPolygon();
@@ -121,16 +128,21 @@ public class PolygonDrawer : MonoBehaviour {
 
         // draw holes
         Gizmos.color = Color.red;
-        prev = poly.points[poly.numHullPoints];
+      
+        for (int i = 0; i < poly.numHoles; i++)
+        {
+            prev = poly.points[poly.IndexOfPointInHole(0,i)];
 
-        for (int i = 0; i < poly.numHolePoints; i++)
-		{
-            Vector3 next = poly.points[poly.numHullPoints + (( i + 1) % poly.numHolePoints)];
-			Gizmos.DrawLine(prev, next);
-			prev = next;
+			for (int j = 0; j < poly.numPointsPerHole[i]; j++)
+			{
+                Vector3 next = poly.points[poly.IndexOfPointInHole((j+1)%poly.numPointsPerHole[i],i)];
+				Gizmos.DrawLine(prev, next);
+				prev = next;
 
-            Gizmos.DrawSphere(poly.points[poly.numHullPoints + i], .1f);
-		}
+				Gizmos.DrawSphere(poly.points[poly.numHullPoints + j], .1f);
+			}
+        }
+   
 
 	
     }

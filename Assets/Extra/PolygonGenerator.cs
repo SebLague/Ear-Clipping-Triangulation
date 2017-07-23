@@ -19,7 +19,7 @@ public static class PolygonGenerator {
             points[i] = onCircle;
         }
 
-        current = new Polygon(points,new Vector2[0]);
+        //current = new Polygon(points,new Vector2[0]);
     }
 
 
