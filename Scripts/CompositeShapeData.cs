@@ -23,7 +23,7 @@ namespace Sebastian.Geometry
 
             public CompositeShapeData(Vector3[] points)
             {
-                this.points = points.Select(v => v.ToXZ()).ToArray();
+                this.points = points.Select(v => new Vector2(v.x,v.z)).ToArray();
                 IsValidShape = points.Length >= 3 && !IntersectsWithSelf();
 
                 if (IsValidShape)
