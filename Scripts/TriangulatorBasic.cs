@@ -16,19 +16,11 @@ namespace Sebastian.Geometry
     {
         private const float MinAngle = 60;
 
-        private List<Triangle> _formedTriangles;
+        private OrderedList<Triangle> _formedTriangles;
         private int _triIndex;
         private int[] _tris;
 
         private LinkedList<Vertex> vertsInClippedPolygon;
-
-        private void Init(Polygon polygon)
-        {
-            int numHoleToHullConnectionVerts = 2 * polygon.numHoles; // 2 verts are added when connecting a hole to the hull.
-            int totalNumVerts = polygon.numPoints + numHoleToHullConnectionVerts;
-            _tris = new int[(totalNumVerts - 2) * 3];
-            vertsInClippedPolygon = GenerateVertexList(polygon);
-        }
 
         // v1 is considered a convex vertex if v0-v1-v2 are wound in a counter-clockwise order.
         public static float GetAngle(Vector2 v0, Vector2 v1, Vector2 v2)
@@ -36,11 +28,19 @@ namespace Sebastian.Geometry
             return Vector2.Angle(v1 - v0, v1 - v2);
         }
 
+        private class CompareTriangles : IComparer<Triangle>
+        {
+            public int Compare(Triangle x, Triangle y)
+            {
+                return Comparer<float>.Default.Compare(x.SmallestAngle, y.SmallestAngle);
+            }
+        }
+
         public int[] Triangulate(Polygon polygon)
         {
             Init(polygon);
 
-            _formedTriangles = new List<Triangle>();
+            _formedTriangles = new OrderedList<Triangle>(new CompareTriangles());
 
             foreach (var vertexNode in vertsInClippedPolygon.GetNodes())
             {
@@ -83,12 +83,12 @@ namespace Sebastian.Geometry
             {
                 tryToSwapEdges = false;
 
-                foreach (var triangle in _formedTriangles.OrderBy(k => k.GetSmallestAngle()))
+                for (int i = 0; i < _formedTriangles.Count; i++)
                 {
+                    Triangle triangle = _formedTriangles[i];
                     if (NeedSwapEdge(triangle))
                     {
-                        if (tryToSwapEdges = SwapEdges(triangle))
-                            break;
+                        tryToSwapEdges |= SwapEdges(triangle);
                     }
                 }
             }
@@ -305,6 +305,14 @@ namespace Sebastian.Geometry
                    select vertexNode;
         }
 
+        private void Init(Polygon polygon)
+        {
+            int numHoleToHullConnectionVerts = 2 * polygon.numHoles; // 2 verts are added when connecting a hole to the hull.
+            int totalNumVerts = polygon.numPoints + numHoleToHullConnectionVerts;
+            _tris = new int[(totalNumVerts - 2) * 3];
+            vertsInClippedPolygon = GenerateVertexList(polygon);
+        }
+
         // angle of v1v0 ^ v1v2
         private bool IsConvex(Vector2 v0, Vector2 v1, Vector2 v2)
         {
@@ -313,7 +321,7 @@ namespace Sebastian.Geometry
 
         private bool NeedSwapEdge(Triangle triangle)
         {
-            return triangle.GetSmallestAngle() < MinAngle;
+            return triangle.SmallestAngle < MinAngle;
         }
 
         private bool SwapEdges(Triangle triangle)
@@ -338,14 +346,18 @@ namespace Sebastian.Geometry
 
             bool ShouldSwapEdge(Triangle first, Triangle second)
             {
-                float firstSmallestAngle = first.GetSmallestAngle();
-                float secondSmallestAngle = second.GetSmallestAngle();
+                float firstSmallestAngle = first.SmallestAngle;
+                float secondSmallestAngle = second.SmallestAngle;
 
-                first.C = second.C;
-                second.A = first.B;
+                Vertex secondC = second.C;
+                Vertex firstB = first.B;
 
-                float firstSmallestAngle2 = first.GetSmallestAngle();
-                float secondSmallestAngle2 = second.GetSmallestAngle();
+                first.SetVertices(first.A, first.B, secondC);
+
+                second.SetVertices(firstB, second.B, second.C);
+
+                float firstSmallestAngle2 = first.SmallestAngle;
+                float secondSmallestAngle2 = second.SmallestAngle;
 
                 return Mathf.Min(firstSmallestAngle2, secondSmallestAngle2) >
                        Mathf.Min(firstSmallestAngle, secondSmallestAngle);
@@ -364,13 +376,8 @@ namespace Sebastian.Geometry
 
                 if (ShouldSwapEdge(first, second))
                 {
-                    triangle.A = first.A;
-                    triangle.B = first.B;
-                    triangle.C = first.C;
-
-                    otherTriangle.A = second.A;
-                    otherTriangle.B = second.B;
-                    otherTriangle.C = second.C;
+                    triangle.SetVertices(first.A, first.B, first.C);
+                    otherTriangle.SetVertices(second.A, second.B, second.C);
 
                     return true;
                 }
@@ -386,13 +393,8 @@ namespace Sebastian.Geometry
 
                 if (ShouldSwapEdge(first, second))
                 {
-                    triangle.A = first.A;
-                    triangle.B = first.B;
-                    triangle.C = first.C;
-
-                    otherTriangle.A = second.A;
-                    otherTriangle.B = second.B;
-                    otherTriangle.C = second.C;
+                    triangle.SetVertices(first.A, first.B, first.C);
+                    otherTriangle.SetVertices(second.A, second.B, second.C);
 
                     return true;
                 }
@@ -408,13 +410,8 @@ namespace Sebastian.Geometry
 
                 if (ShouldSwapEdge(first, second))
                 {
-                    triangle.A = first.A;
-                    triangle.B = first.B;
-                    triangle.C = first.C;
-
-                    otherTriangle.A = second.A;
-                    otherTriangle.B = second.B;
-                    otherTriangle.C = second.C;
+                    triangle.SetVertices(first.A, first.B, first.C);
+                    otherTriangle.SetVertices(second.A, second.B, second.C);
 
                     return true;
                 }
@@ -483,18 +480,27 @@ namespace Sebastian.Geometry
 
         public class Triangle
         {
-            public Vertex A;
-            public Vertex B;
-            public Vertex C;
+            public Vertex A { get; private set; }
+            public Vertex B { get; private set; }
+            public Vertex C { get; private set; }
 
             public Triangle(Vertex a, Vertex b, Vertex c)
+            {
+                SetVertices(a, b, c);
+            }
+
+            public void SetVertices(Vertex a, Vertex b, Vertex c)
             {
                 A = a;
                 B = b;
                 C = c;
+
+                SmallestAngle = GetSmallestAngle();
             }
 
-            public float GetSmallestAngle()
+            public float SmallestAngle { get; private set; }
+
+            private float GetSmallestAngle()
             {
                 var angles = new float[] {
                             GetAngle(A.position, B.position, C.position),
