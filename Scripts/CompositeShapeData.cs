@@ -21,7 +21,7 @@ namespace Sebastian.Geometry
             public List<CompositeShapeData> holes = new List<CompositeShapeData>();
             public bool IsValidShape { get; private set; }
 
-            public CompositeShapeData(Vector3[] points)
+            public CompositeShapeData(Vector3[] points, ITriangulator triangulator)
             {
                 this.points = points.Select(v => new Vector2(v.x,v.z)).ToArray();
                 IsValidShape = points.Length >= 3 && !IntersectsWithSelf();
@@ -29,8 +29,7 @@ namespace Sebastian.Geometry
                 if (IsValidShape)
                 {
                     polygon = new Polygon(this.points);
-                    Triangulator t = new Triangulator(polygon);
-                    triangles = t.Triangulate();
+                    triangles = triangulator.Triangulate(polygon);
                 }
             }
 

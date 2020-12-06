@@ -9,13 +9,13 @@ namespace Sebastian.Geometry
      * https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf
      */
 
-	public class Triangulator
+	public class Triangulator : ITriangulator
     {
         LinkedList<Vertex> vertsInClippedPolygon;
         int[] tris;
         int triIndex;
 
-        public Triangulator(Polygon polygon)
+        private void Init(Polygon polygon)
         {
             int numHoleToHullConnectionVerts = 2 * polygon.numHoles; // 2 verts are added when connecting a hole to the hull.
             int totalNumVerts = polygon.numPoints + numHoleToHullConnectionVerts;
@@ -23,8 +23,10 @@ namespace Sebastian.Geometry
             vertsInClippedPolygon = GenerateVertexList(polygon);
         }
 
-        public int[] Triangulate()
+        public int[] Triangulate(Polygon polygon)
         {
+            Init(polygon);
+
             while (vertsInClippedPolygon.Count >= 3)
             {
                 bool hasRemovedEarThisIteration = false;

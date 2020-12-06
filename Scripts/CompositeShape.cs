@@ -24,9 +24,10 @@ namespace Sebastian.Geometry
             this.shapes = shapes.ToArray();
         }
 
-        public Mesh GetMesh()
+        public Mesh GetMesh<T>()
+            where T : ITriangulator, new()
         {
-            Process();
+            Process<T>();
 
             return new Mesh()
             {
@@ -36,10 +37,11 @@ namespace Sebastian.Geometry
             };
         }
 
-        public void Process()
+        public void Process<T>()
+            where T : ITriangulator, new()
         {
             // Generate array of valid shape data
-            CompositeShapeData[] eligibleShapes = shapes.Select(x => new CompositeShapeData(x.points.ToArray())).Where(x => x.IsValidShape).ToArray();
+            CompositeShapeData[] eligibleShapes = shapes.Select(x => new CompositeShapeData(x.Points.ToArray(), new T())).Where(x => x.IsValidShape).ToArray();
 
             // Set parents for all shapes. A parent is a shape which completely contains another shape.
             for (int i = 0; i < eligibleShapes.Length; i++)
@@ -74,7 +76,7 @@ namespace Sebastian.Geometry
             }
             // Create polygons from the solid shapes and their associated hole shapes
             Polygon[] polygons = solidShapes.Select(x => new Polygon(x.polygon.points, x.holes.Select(h => h.polygon.points).ToArray())).ToArray();
-  
+
             // Flatten the points arrays from all polygons into a single array, and convert the vector2s to vector3s.
             vertices = polygons.SelectMany(x => x.points.Select(v2 => new Vector3(v2.x, height, v2.y))).ToArray();
 
@@ -83,8 +85,8 @@ namespace Sebastian.Geometry
             int startVertexIndex = 0;
             for (int i = 0; i < polygons.Length; i++)
             {
-                Triangulator triangulator = new Triangulator(polygons[i]);
-                int[] polygonTriangles = triangulator.Triangulate();
+                ITriangulator triangulator = new T();
+                int[] polygonTriangles = triangulator.Triangulate(polygons[i]);
 
                 for (int j = 0; j < polygonTriangles.Length; j++)
                 {
